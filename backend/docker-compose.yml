@@ -1,0 +1,36 @@
+# OPTIONAL. You do NOT need this file to run the backend locally — the
+# default SQLite setup (see README "Quick start") needs no Docker at all.
+# This is here for when you want to run the backend + a real Postgres
+# database in containers, e.g. to test production-like behaviour.
+#
+# Usage:  docker compose up --build
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: infrasense
+      POSTGRES_USER: infrasense
+      POSTGRES_PASSWORD: infrasense_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - infrasense_pg_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+psycopg://infrasense:infrasense_dev_password@db:5432/infrasense
+      SECRET_KEY: docker-dev-secret-change-me
+      CORS_ORIGINS: http://localhost:3000
+      STORAGE_PROVIDER: local
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./media:/app/media
+
+volumes:
+  infrasense_pg_data:

@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+infrasense.db
+media/*
+!media/.gitkeep
+.pytest_cache/
+*.egg-info/
