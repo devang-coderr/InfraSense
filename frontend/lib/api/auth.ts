@@ -6,6 +6,9 @@ export interface AuthUser {
   email: string;
   role: "citizen" | "officer" | "department_admin" | "super_admin";
   department: string | null;
+  organization?: string | null;
+  state?: string | null;
+  district?: string | null;
 }
 
 interface TokenResponse {
@@ -28,7 +31,10 @@ export async function register(
   email: string,
   password: string,
   role: AuthUser["role"] = "citizen",
-  departmentName?: string
+  departmentName?: string,
+  organization?: string,
+  state?: string,
+  district?: string
 ): Promise<AuthUser> {
   const data = await apiFetch<TokenResponse>("/auth/register", {
     method: "POST",
@@ -38,6 +44,9 @@ export async function register(
       password,
       role,
       department_name: departmentName || undefined,
+      organization: organization || undefined,
+      state: state || undefined,
+      district: district || undefined,
     }),
   });
   setToken(data.access_token);

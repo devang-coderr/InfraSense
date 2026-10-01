@@ -25,6 +25,9 @@ def register_user(db: Session, payload: RegisterRequest) -> User:
         password_hash=hash_password(payload.password),
         role=payload.role,
         department_id=department_id,
+        organization=payload.organization,
+        state=payload.state,
+        district=payload.district,
     )
     db.add(user)
     db.commit()

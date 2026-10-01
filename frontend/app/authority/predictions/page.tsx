@@ -56,9 +56,9 @@ export default function PredictionsPage() {
     <AuthorityShell>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <PageHeader
-          eyebrow="Predictive Intelligence"
+          eyebrow="Ward Risk Intelligence"
           title="From Reactive Repair to Proactive Prevention"
-          description="Spatial regression, seasonal degradation trends, and civic report frequency models forecasting infrastructure stress before critical failure."
+          description="Severity-weighted incident density, open report clustering, and ward-level load indicators highlighting infrastructure areas requiring preventive maintenance."
         />
         <button
           type="button"
@@ -67,7 +67,7 @@ export default function PredictionsPage() {
           className="focus-ring self-start sm:self-auto flex items-center gap-2 px-3 py-2 rounded-xl text-[12.5px] font-mono bg-[#1C1F21] border border-[#2C2A25] text-[#F3F0E8] hover:bg-[#25282A] transition-colors disabled:opacity-50 cursor-pointer"
         >
           <RefreshCw size={14} className={loading ? "animate-spin text-[#F4B52C]" : "text-[#8D918F]"} />
-          <span>Refresh Forecast</span>
+          <span>Refresh Analysis</span>
         </button>
       </div>
 
@@ -80,21 +80,21 @@ export default function PredictionsPage() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[13px] font-medium text-[#F3F0E8]">
-                AI-Assisted Infrastructure Forecast Engine
+                Ward Infrastructure Risk Assessment
               </span>
               <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-[#2C2A25] text-[#F4B52C] border border-[#F4B52C]/30">
-                Probabilistic Model
+                Baseline Risk Model
               </span>
             </div>
             <p className="text-[12px] text-[#8D918F] mt-0.5">
-              Forecasts are generated using historical repair logs, seasonal weather indices, and report clustering. Use for preventive maintenance planning.
+              Risk indices are computed from active unresolved reports, severity-weight load (critical=4, high=3, medium=2, low=1), and geographic clustering in your jurisdiction.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-[11px] font-mono text-[#8D918F] bg-[#1C1F21] px-3 py-1.5 rounded-lg border border-[#2C2A25] shrink-0">
           <Clock size={12} className="text-[#F4B52C]" />
-          <span>Forecast Horizon: 14 – 60 Days</span>
+          <span>Planning Horizon: Next 30 Days</span>
         </div>
       </div>
 
@@ -126,7 +126,7 @@ export default function PredictionsPage() {
           }`}
         >
           <AlertTriangle size={14} className="text-[#B23A2C]" />
-          <span>High Probability ({">"}60%)</span>
+          <span>High Risk Index ({">"}60)</span>
           <span className="text-[10.5px] font-mono bg-[#1C1F21] px-1.5 py-0.5 rounded text-[#8D918F]">
             {risks.filter((r) => (r.risk || 0) >= 60).length}
           </span>
@@ -215,7 +215,7 @@ export default function PredictionsPage() {
                         {riskValue}%
                       </span>
                       <div className="text-[10px] font-mono text-[#8D918F] uppercase tracking-wider mt-1">
-                        Risk Probability
+                        Risk Index
                       </div>
                     </div>
                   </div>
@@ -223,7 +223,7 @@ export default function PredictionsPage() {
                   {w.window && (
                     <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#8D918F] bg-[#1C1F21] border border-[#2C2A25] rounded-lg px-2.5 py-1 w-fit mb-4">
                       <Clock size={12} className="text-[#F4B52C]" />
-                      <span>Anticipated Window: {w.window}</span>
+                      <span>Planning Window: {w.window}</span>
                     </div>
                   )}
 
@@ -232,7 +232,7 @@ export default function PredictionsPage() {
                     <div className="mb-4">
                       <div className="text-[11px] font-mono uppercase tracking-wider text-[#8D918F] mb-2 flex items-center gap-1.5">
                         <HelpCircle size={12} className="text-[#F4B52C]" />
-                        <span>Predictive Indicators</span>
+                        <span>Contributing Factors</span>
                       </div>
                       <ul className="space-y-1.5">
                         {w.reasons.map((r, rIdx) => (
@@ -265,8 +265,8 @@ export default function PredictionsPage() {
                 </div>
 
                 <div className="mt-5 pt-3 border-t border-[#2C2A25] flex items-center justify-between text-[11px] font-mono text-[#8D918F]">
-                  <span>Source: Spatial Predictive Engine</span>
-                  <span className="text-[#6F6B63]">Confidence 92%</span>
+                  <span>Source: Ward Incident Density Model</span>
+                  <span className="text-[#6F6B63]">Baseline Assessment</span>
                 </div>
               </div>
             );

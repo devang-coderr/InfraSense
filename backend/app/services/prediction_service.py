@@ -16,14 +16,19 @@ from collections import defaultdict
 from sqlalchemy.orm import Session
 
 from app.database.models.issue import Issue
+from app.database.models.user import User
 from app.database.models.ward import Ward
+from app.services.jurisdiction_service import apply_jurisdiction_scope
 
 SEVERITY_WEIGHT = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 
 
-def compute_ward_risks(db: Session) -> list[dict]:
+def compute_ward_risks(db: Session, user: User | None = None) -> list[dict]:
     wards = {w.id: w for w in db.query(Ward).all()}
-    issues = db.query(Issue).filter(Issue.status != "resolved").all()
+    query = db.query(Issue).filter(Issue.status != "resolved")
+    if user:
+        query = apply_jurisdiction_scope(query, user)
+    issues = query.all()
 
     # (ward_id, category) -> {"weight": int, "count": int}
     buckets: dict[tuple[int, str], dict] = defaultdict(lambda: {"weight": 0, "count": 0})

@@ -13,6 +13,7 @@ const columns = [
   {
     title: "Resources",
     links: [
+      { label: "Public Transparency", href: "/transparency" },
       { label: "How It Works", href: "/#how-it-works" },
       { label: "GIS Intelligence", href: "/authority/map" },
       { label: "Predictive Risk", href: "/authority/predictions" },
@@ -68,9 +69,7 @@ export function Footer() {
           </div>
         ))}
       </div>
-      <div className="mt-14 pt-6 border-t border-[var(--border)] text-[12px] text-[var(--text-muted)] font-mono">
-        InfraSense — SIH 2026 concept build. All data shown is sample/demo data.
-      </div>
+      
     </footer>
   );
 }

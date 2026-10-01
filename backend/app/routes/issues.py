@@ -7,7 +7,7 @@ from app.core.response import ok
 from app.database.database import get_db
 from app.database.models.issue import Issue
 from app.database.models.department import Department
-from app.database.models.enums import IssueStatus
+from app.database.models.enums import IssueStatus, UserRole
 from app.database.models.user import User
 from app.schemas.issue import IssueCreateRequest, IssueUpdateRequest, IssueListResponse
 from app.services import gis_service
@@ -50,8 +50,11 @@ def list_issues(
         from app.database.models.ward import Ward
 
         query = query.join(Ward, Issue.ward_id == Ward.id).filter(Ward.name == ward)
-    if mine:
+    if mine or user.role == UserRole.CITIZEN:
         query = query.filter(Issue.reported_by == user.id)
+    elif user.role in (UserRole.OFFICER, UserRole.DEPARTMENT_ADMIN):
+        from app.services.jurisdiction_service import apply_jurisdiction_scope
+        query = apply_jurisdiction_scope(query, user)
 
     items = query.order_by(Issue.reported_at.desc()).all()
     return ok(IssueListResponse(items=[issue_to_out(i) for i in items], total=len(items)))
@@ -59,7 +62,11 @@ def list_issues(
 
 @router.get("/map")
 def issues_map(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    items = db.query(Issue).all()
+    query = db.query(Issue)
+    if user.role in (UserRole.OFFICER, UserRole.DEPARTMENT_ADMIN):
+        from app.services.jurisdiction_service import apply_jurisdiction_scope
+        query = apply_jurisdiction_scope(query, user)
+    items = query.all()
     return ok([issue_to_out(i) for i in items])
 
 
@@ -85,6 +92,13 @@ def get_issue(issue_id: int, user: User = Depends(get_current_user), db: Session
     issue = db.get(Issue, issue_id)
     if not issue:
         raise AppError("ISSUE_NOT_FOUND", "Issue not found.", 404)
+    if user.role == UserRole.CITIZEN:
+        if issue.reported_by != user.id:
+            raise AppError("ISSUE_NOT_FOUND", "Issue not found.", 404)
+    elif user.role in (UserRole.OFFICER, UserRole.DEPARTMENT_ADMIN):
+        from app.services.jurisdiction_service import is_issue_in_jurisdiction
+        if not is_issue_in_jurisdiction(issue, user):
+            raise AppError("ISSUE_NOT_FOUND", "Issue not found.", 404)
     return ok(issue_to_out(issue))
 
 
@@ -99,11 +113,18 @@ def update_issue(
     if not issue:
         raise AppError("ISSUE_NOT_FOUND", "Issue not found.", 404)
 
+    from app.services.jurisdiction_service import is_issue_in_jurisdiction
+    if not is_issue_in_jurisdiction(issue, user):
+        raise AppError("ISSUE_NOT_FOUND", "Issue not found.", 404)
+
     if payload.status:
         valid_statuses = {s.value for s in IssueStatus}
         if payload.status not in valid_statuses:
             raise AppError("INVALID_STATUS", f"Status must be one of {sorted(valid_statuses)}.", 422)
         issue.status = IssueStatus(payload.status)
+        if issue.status == IssueStatus.RESOLVED:
+            from app.services import alert_service
+            alert_service.resolve_alerts_for_issue(db, issue.id)
 
     if payload.department_id is not None:
         dept = db.get(Department, payload.department_id)

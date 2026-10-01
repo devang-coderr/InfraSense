@@ -25,6 +25,7 @@ from app.routes import (
     analytics,
     predictions,
     notifications,
+    transparency,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -61,6 +62,7 @@ app.include_router(work_orders.router)
 app.include_router(analytics.router)
 app.include_router(predictions.router)
 app.include_router(notifications.router)
+app.include_router(transparency.router)
 
 
 @app.get("/")

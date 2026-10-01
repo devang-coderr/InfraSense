@@ -9,6 +9,9 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     role: UserRole = UserRole.CITIZEN
     department_name: str | None = None  # only meaningful for officer/department_admin signups
+    organization: str | None = None
+    state: str | None = None
+    district: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -22,6 +25,9 @@ class UserOut(BaseModel):
     email: str
     role: UserRole
     department: str | None = None
+    organization: str | None = None
+    state: str | None = None
+    district: str | None = None
 
 
 class TokenResponse(BaseModel):

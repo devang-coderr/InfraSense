@@ -18,14 +18,74 @@ export interface ResolutionStats {
   average_resolution_days: number;
 }
 
+export interface SeverityCount {
+  severity: string;
+  label: string;
+  count: number;
+  color: string;
+}
+
+export interface WorkOrderAnalytics {
+  total: number;
+  pending: number;
+  assigned: number;
+  in_progress: number;
+  completed: number;
+  verified: number;
+  completion_rate: number;
+}
+
+export interface WardAnalyticsItem {
+  ward: string;
+  total_issues: number;
+  open_issues: number;
+  resolved_issues: number;
+}
+
+export interface AnalyticsSummary {
+  total_reports: number;
+  open_issues: number;
+  resolved_issues: number;
+  critical_issues: number;
+  high_priority_issues: number;
+  resolution_rate: number;
+  average_resolution_days: number;
+}
+
 export interface HealthResponse {
   city_health_score: number;
   categories: HealthCategory[];
   methodology: string;
 }
 
+export interface AnalyticsOverview {
+  summary: AnalyticsSummary;
+  severity_distribution: SeverityCount[];
+  category_breakdown: CategoryCount[];
+  work_order_stats: WorkOrderAnalytics;
+  ward_breakdown: WardAnalyticsItem[];
+  trends: TrendPoint[];
+  health: HealthResponse;
+}
+
+export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
+  return apiFetch<AnalyticsOverview>("/analytics/overview");
+}
+
 export async function getCategoryBreakdown(): Promise<CategoryCount[]> {
   return apiFetch<CategoryCount[]>("/analytics/categories");
+}
+
+export async function getSeverityDistribution(): Promise<SeverityCount[]> {
+  return apiFetch<SeverityCount[]>("/analytics/severity");
+}
+
+export async function getWorkOrderAnalytics(): Promise<WorkOrderAnalytics> {
+  return apiFetch<WorkOrderAnalytics>("/analytics/work-orders");
+}
+
+export async function getWardAnalytics(): Promise<WardAnalyticsItem[]> {
+  return apiFetch<WardAnalyticsItem[]>("/analytics/wards");
 }
 
 export async function getTrends(): Promise<TrendPoint[]> {

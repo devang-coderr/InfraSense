@@ -6,37 +6,46 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.ai.vision import analyze_image
+from app.core.exceptions import AppError
 from app.database.models.ai_analysis import AIAnalysis
 from app.database.models.issue import Issue, IssueSeverityFactor, IssuePriorityFactor
 from app.database.models.enums import IssueStatus
 from app.database.models.notification import Notification
 from app.services import duplicate_service, department_service
+from app.core.constants import OFFICIAL_CATEGORIES, CATEGORY_SYNONYMS
 from app.services.gis_service import nearest_ward
 from app.services.priority_service import calculate_priority
 from app.services.severity_service import calculate_severity
 from app.schemas.issue import IssueCreateRequest
 
-KNOWN_CATEGORIES: dict[str, str] = {
-    "pothole": "Pothole",
-    "open manhole": "Open Manhole",
-    "road crack": "Road Crack",
-    "traffic signal": "Traffic Signal",
-    "streetlight": "Streetlight",
-    "garbage": "Garbage",
-    "water leakage": "Water Leakage",
-    "traffic": "Traffic",
-    "waterlogging": "Water Leakage",
-}
+KNOWN_CATEGORIES: dict[str, str] = CATEGORY_SYNONYMS
 
 
 def normalize_category(cat: str | None) -> str:
     if not cat:
         return "Pothole"
     cleaned = cat.strip().lower()
-    return KNOWN_CATEGORIES.get(cleaned, cat.strip().title())
+    return CATEGORY_SYNONYMS.get(cleaned, cat.strip().title())
 
 
 def create_issue_pipeline(db: Session, reporter_id: int, payload: IssueCreateRequest) -> Issue:
+    # 0. Media resolution & validation
+    resolved_media_ids: list[int] = []
+    if payload.media_ids is not None:
+        for mid in payload.media_ids:
+            if mid and mid not in resolved_media_ids:
+                resolved_media_ids.append(mid)
+    elif payload.media_id is not None:
+        resolved_media_ids.append(payload.media_id)
+
+    # Server-side validation: Maximum 5 evidence images per issue
+    if len(resolved_media_ids) > 5:
+        raise AppError(
+            "MAX_MEDIA_LIMIT_EXCEEDED",
+            "An issue can have a maximum of 5 evidence images.",
+            422,
+        )
+
     # 1. Category normalization & AI scan (always evaluate final submitted description first)
     raw_cat, confidence = analyze_image(description_hint=payload.description)
     category = normalize_category(raw_cat)
@@ -67,6 +76,8 @@ def create_issue_pipeline(db: Session, reporter_id: int, payload: IssueCreateReq
         latitude=lat,
         longitude=lng,
         ward_id=ward.id if ward else None,
+        state=payload.state,
+        district=payload.district,
         severity=severity,
         severity_score=severity_score,
         confidence=confidence,
@@ -77,12 +88,16 @@ def create_issue_pipeline(db: Session, reporter_id: int, payload: IssueCreateReq
     db.add(issue)
     db.flush()  # assigns issue.id without committing yet
 
-    # Link uploaded IssueMedia if media_id was provided
-    if payload.media_id:
+    # Link uploaded IssueMedia records if media_ids were provided
+    new_media_hashes: list[str] = []
+    if resolved_media_ids:
         from app.database.models.issue_media import IssueMedia
-        media = db.get(IssueMedia, payload.media_id)
-        if media and (media.issue_id is None or media.uploaded_by == reporter_id):
-            media.issue_id = issue.id
+        for mid in resolved_media_ids:
+            media = db.get(IssueMedia, mid)
+            if media and (media.issue_id is None or media.uploaded_by == reporter_id):
+                media.issue_id = issue.id
+                if media.perceptual_hash:
+                    new_media_hashes.append(media.perceptual_hash)
 
     for f in severity_factors:
         db.add(IssueSeverityFactor(issue_id=issue.id, **f))
@@ -90,9 +105,9 @@ def create_issue_pipeline(db: Session, reporter_id: int, payload: IssueCreateReq
     db.add(
         AIAnalysis(
             issue_id=issue.id,
-            model_name="baseline-rule-based",
-            model_version="v1",
-            is_baseline=True,
+            model_name="EfficientNet-B0",
+            model_version="v1.0",
+            is_baseline=False,
             category=category,
             confidence=confidence,
             severity_score=severity_score,
@@ -100,15 +115,24 @@ def create_issue_pipeline(db: Session, reporter_id: int, payload: IssueCreateReq
         )
     )
 
-    # 5. Duplicate detection (excludes the issue we just created)
-    dup_match = duplicate_service.find_possible_duplicate(
-        db, category=category, lat=payload.latitude, lng=payload.longitude, exclude_issue_id=issue.id
+    # 5. Multi-Signal Duplicate Detection
+    from app.schemas.issue import DuplicateAssessmentOut, DuplicateSignalMatchOut
+    dup_assessment_data = duplicate_service.assess_and_record_duplicates(
+        db, new_issue=issue, new_media_hashes=new_media_hashes
     )
+
+    assessment_out = DuplicateAssessmentOut(
+        status=dup_assessment_data["status"],
+        matched_issue_id=dup_assessment_data["matched_issue_id"],
+        matches=[
+            DuplicateSignalMatchOut(**m) for m in dup_assessment_data.get("matches", [])
+        ],
+    )
+    setattr(issue, "_duplicate_assessment", assessment_out)
+
     master_for_priority = issue
-    if dup_match:
-        master, distance_m = dup_match
-        duplicate_service.record_duplicate(db, master=master, new_issue=issue, distance_m=distance_m)
-        master_for_priority = master
+    if dup_assessment_data.get("master_issue"):
+        master_for_priority = dup_assessment_data["master_issue"]
 
     # 6. Priority calculation
     age_days = 0.0
@@ -141,8 +165,14 @@ def create_issue_pipeline(db: Session, reporter_id: int, payload: IssueCreateReq
             type="report_received",
             title="Report received",
             message=f"Your report has been received and classified as '{category}'.",
+            status="unread",
+            is_read=False,
         )
     )
+
+    # 9. Jurisdiction-Aware Authority Alert Engine Evaluation
+    from app.services import alert_service
+    alert_service.evaluate_and_create_alerts(db, issue=issue, trigger="ISSUE_CREATED")
 
     db.commit()
     db.refresh(issue)

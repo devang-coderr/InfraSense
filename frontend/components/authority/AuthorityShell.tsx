@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -15,6 +16,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
+import { getUnreadCount } from "@/lib/api/notifications";
 
 const nav = [
   { href: "/authority", label: "Dashboard", icon: LayoutDashboard },
@@ -29,6 +31,15 @@ const nav = [
 export function AuthorityShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
+  const [unreadAlerts, setUnreadAlerts] = useState<number>(0);
+
+  useEffect(() => {
+    if (user && user.role !== "citizen") {
+      getUnreadCount()
+        .then((c) => setUnreadAlerts(c))
+        .catch(() => {});
+    }
+  }, [user, pathname]);
 
   const initial = user?.name ? user.name.trim().charAt(0).toUpperCase() : "A";
   const roleLabel = user?.department || (user?.role ? user.role.replace("_", " ") : "Municipal Officer");
@@ -90,6 +101,7 @@ export function AuthorityShell({ children }: { children: React.ReactNode }) {
             {nav.map((n) => {
               const active = pathname === n.href;
               const Icon = n.icon;
+              const isAlertsNav = n.href === "/notifications";
               return (
                 <Link
                   key={n.href}
@@ -107,9 +119,16 @@ export function AuthorityShell({ children }: { children: React.ReactNode }) {
                     />
                     <span>{n.label}</span>
                   </div>
-                  {active && (
-                    <span className="hidden md:block h-1.5 w-1.5 rounded-full bg-[#F4B52C]" />
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {isAlertsNav && unreadAlerts > 0 && (
+                      <span className="text-[10px] font-mono bg-[#F4B52C]/20 text-[#F4B52C] px-1.5 py-0.5 rounded font-bold border border-[#F4B52C]/30">
+                        {unreadAlerts}
+                      </span>
+                    )}
+                    {active && (
+                      <span className="hidden md:block h-1.5 w-1.5 rounded-full bg-[#F4B52C]" />
+                    )}
+                  </div>
                 </Link>
               );
             })}
@@ -133,6 +152,11 @@ export function AuthorityShell({ children }: { children: React.ReactNode }) {
                   <div className="text-[10.5px] font-mono text-[#8D918F] truncate capitalize">
                     {roleLabel}
                   </div>
+                  {(user.district || user.state) && (
+                    <div className="text-[9.5px] font-mono text-[#F4B52C] truncate">
+                      {user.district ? `${user.district}, ${user.state}` : user.state}
+                    </div>
+                  )}
                 </div>
               </div>
               <button

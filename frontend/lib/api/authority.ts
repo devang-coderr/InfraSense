@@ -9,6 +9,9 @@ export interface AuthorityDashboard {
   resolved_issues: number;
   average_resolution_days: number;
   infrastructure_health: number;
+  open_work_orders?: number;
+  in_progress_work_orders?: number;
+  completed_work_orders?: number;
 }
 
 export async function getAuthorityDashboard(): Promise<AuthorityDashboard> {

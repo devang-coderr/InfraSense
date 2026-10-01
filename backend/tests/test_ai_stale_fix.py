@@ -67,16 +67,18 @@ class TestAIStaleFix(unittest.TestCase):
         self.assertEqual(data["category"], "Streetlight")
         self.assertEqual(data["description"], "street light damage.")
 
-    def test_non_streetlight_baseline_categories(self):
+    def test_all_8_official_baseline_categories(self):
         token = self._get_token()
         headers = {"Authorization": f"Bearer {token}"}
         cases = [
             ("pothole on main road", "Pothole"),
             ("road crack near sidewalk", "Road Crack"),
             ("street light damage.", "Streetlight"),
-            ("garbage dumping site", "Garbage"),
             ("broken traffic light", "Traffic Signal"),
+            ("garbage dumping site", "Garbage"),
             ("water pipe leaking on street", "Water Leakage"),
+            ("blocked drainage line", "Drainage"),
+            ("dangerous open manhole on street", "Open Manhole"),
         ]
         for desc, expected in cases:
             resp = self.client.post(
@@ -84,7 +86,7 @@ class TestAIStaleFix(unittest.TestCase):
                 json={"description": desc, "latitude": 22.7, "longitude": 75.8},
                 headers=headers,
             )
-            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.status_code, 200, f"Failed for category {expected}")
             self.assertEqual(resp.json()["data"]["category"], expected)
 
 

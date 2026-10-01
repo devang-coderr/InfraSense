@@ -27,11 +27,17 @@ from app.database.models.enums import Severity
 CATEGORY_DAMAGE_BASELINE: dict[str, int] = {
     "pothole": 30,
     "open manhole": 32,
+    "open_manhole": 32,
     "road crack": 12,
+    "road_crack": 12,
     "traffic signal": 22,
+    "traffic_signal": 22,
     "streetlight": 18,
     "garbage": 16,
     "water leakage": 24,
+    "water_leakage": 24,
+    "drainage": 22,
+    "drain": 22,
 }
 
 # Road importance is a placeholder constant until real road-classification

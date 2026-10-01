@@ -73,10 +73,19 @@ export default function AuthorityDashboardPage() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-6 mb-8 border-b border-[#2C2A25]">
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F4B52C]/10 border border-[#F4B52C]/30 text-[#F4B52C] font-mono text-[10.5px] uppercase tracking-wider font-semibold">
               <span className="h-1.5 w-1.5 rounded-full bg-[#F4B52C] animate-pulse" />
               Live Operations Command
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#1C1F21] border border-[#2C2A25] text-[#8D918F] font-mono text-[10.5px]">
+              <MapPin size={11} className="text-[#F4B52C]" />
+              <span>
+                Jurisdiction:{" "}
+                <strong className="text-[#F3F0E8]">
+                  {user?.district ? `${user.district}, ${user.state}` : user?.state || "All Jurisdictions"}
+                </strong>
+              </span>
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F3F0E8]">

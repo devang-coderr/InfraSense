@@ -306,11 +306,13 @@ export const trendSeries = [
 
 export const categorySeries = [
   { name: "Pothole", value: 640, color: "var(--critical)" },
+  { name: "Road Crack", value: 340, color: "var(--high)" },
   { name: "Streetlight", value: 410, color: "var(--high)" },
+  { name: "Traffic Signal", value: 180, color: "#9B8F73" },
   { name: "Garbage", value: 505, color: "#6FA8B5" },
-  { name: "Water leak", value: 260, color: "var(--low)" },
-  { name: "Signal", value: 180, color: "#9B8F73" },
-  { name: "Other", value: 320, color: "#B58562" },
+  { name: "Water Leakage", value: 260, color: "var(--low)" },
+  { name: "Drainage", value: 130, color: "#4C7A5E" },
+  { name: "Open Manhole", value: 190, color: "var(--critical)" },
 ];
 
 export function getIssue(id: string) {

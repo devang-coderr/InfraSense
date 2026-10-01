@@ -18,6 +18,40 @@ class ResolutionStats(BaseModel):
     average_resolution_days: float
 
 
+class SeverityCount(BaseModel):
+    severity: str
+    label: str
+    count: int
+    color: str
+
+
+class WorkOrderAnalytics(BaseModel):
+    total: int
+    pending: int
+    assigned: int
+    in_progress: int
+    completed: int
+    verified: int
+    completion_rate: float
+
+
+class WardAnalyticsItem(BaseModel):
+    ward: str
+    total_issues: int
+    open_issues: int
+    resolved_issues: int
+
+
+class AnalyticsSummary(BaseModel):
+    total_reports: int
+    open_issues: int
+    resolved_issues: int
+    critical_issues: int
+    high_priority_issues: int
+    resolution_rate: float
+    average_resolution_days: float
+
+
 class HealthCategoryOut(BaseModel):
     label: str
     score: int
@@ -34,6 +68,16 @@ class HealthResponse(BaseModel):
     )
 
 
+class AnalyticsOverviewOut(BaseModel):
+    summary: AnalyticsSummary
+    severity_distribution: list[SeverityCount]
+    category_breakdown: list[CategoryCount]
+    work_order_stats: WorkOrderAnalytics
+    ward_breakdown: list[WardAnalyticsItem]
+    trends: list[TrendPoint]
+    health: HealthResponse
+
+
 class AuthorityDashboardOut(BaseModel):
     total_issues: int
     critical_issues: int
@@ -41,3 +85,6 @@ class AuthorityDashboardOut(BaseModel):
     resolved_issues: int
     average_resolution_days: float
     infrastructure_health: int
+    open_work_orders: int = 0
+    in_progress_work_orders: int = 0
+    completed_work_orders: int = 0

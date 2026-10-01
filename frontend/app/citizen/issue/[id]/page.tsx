@@ -20,6 +20,8 @@ import {
   ImageOff,
   Maximize2,
   X,
+  Briefcase,
+  Check,
 } from "lucide-react";
 import { getIssue } from "@/lib/api/issues";
 import { ApiError, getMediaUrl } from "@/lib/api/client";
@@ -27,39 +29,12 @@ import { SeverityBadge, StatusPill, ScoreBar } from "@/components/ui/Primitives"
 import { Button } from "@/components/ui/Button";
 import type { Issue, IssueStatus } from "@/lib/types";
 
-interface StatusStep {
-  key: IssueStatus;
+interface LifecycleStep {
+  key: string;
   label: string;
   description: string;
+  timestamp?: string | null;
 }
-
-const statusSteps: StatusStep[] = [
-  {
-    key: "reported",
-    label: "Report Submitted",
-    description: "Citizen logged issue with photo and GPS location coordinates.",
-  },
-  {
-    key: "ai_verified",
-    label: "AI Diagnostic Verification",
-    description: "Computer vision assessed defect category, severity, and duplicates.",
-  },
-  {
-    key: "assigned",
-    label: "Department Assigned",
-    description: "Routed to responsible municipal department for work scheduling.",
-  },
-  {
-    key: "in_progress",
-    label: "Field Work in Progress",
-    description: "Technician work crew dispatched to site for physical repair.",
-  },
-  {
-    key: "resolved",
-    label: "Resolution Completed",
-    description: "Repairs finalized and verified by municipal authority.",
-  },
-];
 
 const statusTone: Record<IssueStatus, "neutral" | "accent" | "high" | "low"> = {
   reported: "neutral",
@@ -79,6 +54,7 @@ export default function CitizenIssuePage() {
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<boolean>(false);
   const [lightboxOpen, setLightboxOpen] = useState<boolean>(false);
+  const [activePhotoIdx, setActivePhotoIdx] = useState<number>(0);
 
   const fetchIssue = useCallback(async () => {
     if (!id) {
@@ -108,18 +84,88 @@ export default function CitizenIssuePage() {
     fetchIssue();
   }, [fetchIssue]);
 
-  const order: IssueStatus[] = ["reported", "ai_verified", "assigned", "in_progress", "resolved"];
-  const currentIdx = issue ? order.indexOf(issue.status) : -1;
+  // Compute active lifecycle stage based on real issue & work order state
+  const wo = issue?.work_order;
+  let currentIdx = 0;
+  if (issue?.status === "resolved" || wo?.status === "verified" || wo?.status === "resolved") {
+    currentIdx = 4;
+  } else if (wo?.status === "completed") {
+    currentIdx = 3;
+  } else if (issue?.status === "in_progress" || wo?.status === "in_progress") {
+    currentIdx = 2;
+  } else if (issue?.status === "assigned" || wo?.status === "assigned" || (issue?.department && issue.department !== "Roads")) {
+    currentIdx = 1;
+  } else if (issue?.status === "ai_verified") {
+    currentIdx = 1;
+  } else {
+    currentIdx = 0;
+  }
 
-  // Resolve API-provided media/image URL if returned by backend
-  const rawEvidenceUrl =
-    issue?.media_url ||
-    issue?.image_url ||
-    issue?.file_url ||
-    issue?.imageUrl ||
-    issue?.mediaUrl ||
-    null;
-  const evidenceUrl = getMediaUrl(rawEvidenceUrl);
+  const lifecycleSteps: LifecycleStep[] = [
+    {
+      key: "reported",
+      label: "Report Submitted",
+      description: "Citizen logged issue with photographic evidence and GPS coordinates.",
+      timestamp: issue?.reportedAt ? new Date(issue.reportedAt).toLocaleDateString() : null,
+    },
+    {
+      key: "assigned",
+      label: "Department Assigned",
+      description: issue?.department
+        ? `Routed to ${issue.department} Department for field action dispatch.`
+        : "Routed to responsible municipal department for action.",
+      timestamp: wo?.created_at ? new Date(wo.created_at).toLocaleDateString() : null,
+    },
+    {
+      key: "in_progress",
+      label: "Field Work in Progress",
+      description: "Maintenance team dispatched to the site to execute repairs.",
+      timestamp: wo?.started_at ? new Date(wo.started_at).toLocaleDateString() : null,
+    },
+    {
+      key: "completed",
+      label: "Field Work Completed",
+      description: "Maintenance operations concluded on site by field crew.",
+      timestamp: wo?.completed_at ? new Date(wo.completed_at).toLocaleDateString() : null,
+    },
+    {
+      key: "resolved",
+      label: "Resolution Verified & Closed",
+      description: "Municipal authority verified repair quality and closed the case.",
+      timestamp: wo?.verified_at
+        ? new Date(wo.verified_at).toLocaleDateString()
+        : issue?.status === "resolved" && issue?.reportedAt
+        ? new Date(issue.reportedAt).toLocaleDateString()
+        : null,
+    },
+  ];
+
+  // Build list of all evidence items
+  const evidenceList: Array<{ url: string; item?: import("@/lib/types").IssueMediaItem }> = [];
+  if (issue?.evidence_images && issue.evidence_images.length > 0) {
+    issue.evidence_images.forEach((img) => {
+      const url = getMediaUrl(img.file_url);
+      if (url) evidenceList.push({ url, item: img });
+    });
+  } else if (issue?.media_urls && issue.media_urls.length > 0) {
+    issue.media_urls.forEach((u) => {
+      const url = getMediaUrl(u);
+      if (url) evidenceList.push({ url });
+    });
+  } else {
+    const rawSingle =
+      issue?.media_url ||
+      issue?.image_url ||
+      issue?.file_url ||
+      issue?.imageUrl ||
+      issue?.mediaUrl ||
+      null;
+    const singleUrl = getMediaUrl(rawSingle);
+    if (singleUrl) evidenceList.push({ url: singleUrl });
+  }
+
+  const currentEvidence = evidenceList[activePhotoIdx] || evidenceList[0];
+  const evidenceUrl = currentEvidence?.url || null;
 
   return (
     <div className="min-h-screen bg-[#0D0F10] text-[#F3F0E8] pt-24 sm:pt-28 pb-24">
@@ -202,7 +248,7 @@ export default function CitizenIssuePage() {
 
                 <div className="flex items-center gap-2 text-[12px] font-mono text-[#8D918F]">
                   <Clock size={13} />
-                  <span>Reported {issue.reportedAt}</span>
+                  <span>Reported {new Date(issue.reportedAt).toLocaleDateString()}</span>
                 </div>
               </div>
 
@@ -227,6 +273,28 @@ export default function CitizenIssuePage() {
               </div>
             </div>
 
+            {/* Resolution Banner if Case is Resolved / Verified */}
+            {(issue.status === "resolved" || wo?.status === "verified") && (
+              <div className="p-4 rounded-2xl bg-[#4C7A5E]/10 border border-[#4C7A5E]/30 flex items-start sm:items-center gap-3.5 shadow-lg">
+                <div className="p-2 rounded-xl bg-[#4C7A5E]/20 text-[#4C7A5E] shrink-0 mt-0.5 sm:mt-0">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-[14px] font-semibold text-[#F3F0E8]">
+                      Case Resolution Verified
+                    </h4>
+                    <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-[#4C7A5E]/20 text-[#4C7A5E] border border-[#4C7A5E]/30">
+                      Closed
+                    </span>
+                  </div>
+                  <p className="text-[12.5px] text-[#8D918F] mt-0.5 leading-relaxed">
+                    This infrastructure issue has been completed on site and verified by the responsible authority.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Two-Column Grid */}
             <div className="grid md:grid-cols-12 gap-6 items-start">
               {/* Left Column: Evidence, Description & Metadata */}
@@ -236,7 +304,9 @@ export default function CitizenIssuePage() {
                   <div className="flex items-center justify-between mb-3.5">
                     <h3 className="text-[12px] font-mono uppercase tracking-wider text-[#F4B52C] font-semibold flex items-center gap-1.5">
                       <Camera size={14} />
-                      <span>Original Photo Evidence</span>
+                      <span>
+                        Submitted Evidence {evidenceList.length > 1 ? `(${activePhotoIdx + 1}/${evidenceList.length})` : ""}
+                      </span>
                     </h3>
                     {evidenceUrl && !imageError && (
                       <span className="text-[11px] font-mono text-[#8D918F] bg-[#1C1F21] px-2 py-0.5 rounded border border-[#2C2A25]">
@@ -251,7 +321,7 @@ export default function CitizenIssuePage() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={evidenceUrl}
-                          alt={`Uploaded evidence for issue #${issue.id} - ${issue.title}`}
+                          alt={`Uploaded evidence for issue #${issue.id} - Photo ${activePhotoIdx + 1}`}
                           className="w-full h-auto max-h-[340px] object-cover sm:object-contain mx-auto transition-transform group-hover:scale-[1.01]"
                           onError={() => setImageError(true)}
                         />
@@ -264,6 +334,91 @@ export default function CitizenIssuePage() {
                           <span>Expand</span>
                         </button>
                       </div>
+
+                      {/* Multi-Photo Thumbnails */}
+                      {evidenceList.length > 1 && (
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                          {evidenceList.map((ev, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => {
+                                setActivePhotoIdx(i);
+                                setImageError(false);
+                              }}
+                              className={`relative h-14 w-14 rounded-lg overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
+                                i === activePhotoIdx
+                                  ? "border-[#F4B52C] scale-105"
+                                  : "border-[#2C2A25] opacity-60 hover:opacity-100"
+                              }`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={ev.url}
+                                alt={`Thumbnail ${i + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Neutral Evidence Verification Status */}
+                      {currentEvidence?.item && (
+                        <div className="p-3 rounded-xl bg-[#121415] border border-[#2C2A25] text-[12px] space-y-1.5">
+                          <div className="flex items-center justify-between text-[#8D918F] pb-1.5 border-b border-[#2C2A25]">
+                            <span className="font-semibold text-[#F3F0E8]">
+                              Evidence Verification • Photo {activePhotoIdx + 1}
+                            </span>
+                            {(currentEvidence.item.camera_make || currentEvidence.item.camera_model) && (
+                              <span className="font-mono text-[11px]">
+                                {[currentEvidence.item.camera_make, currentEvidence.item.camera_model].filter(Boolean).join(" ")}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-1 text-[11.5px]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[#8D918F]">Location Integrity:</span>
+                              <span
+                                className={`font-mono text-[11px] px-1.5 py-0.5 rounded ${
+                                  currentEvidence.item.evidence_verification?.gps.status === "match"
+                                    ? "bg-[#4C7A5E]/20 text-[#4C7A5E]"
+                                    : currentEvidence.item.evidence_verification?.gps.status === "mismatch"
+                                    ? "bg-[#F4B52C]/20 text-[#F4B52C]"
+                                    : "bg-[#1C1F21] text-[#8D918F]"
+                                }`}
+                              >
+                                {currentEvidence.item.evidence_verification?.gps.status === "match"
+                                  ? "Location consistent"
+                                  : currentEvidence.item.evidence_verification?.gps.status === "mismatch"
+                                  ? "Location mismatch"
+                                  : "Unavailable"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-[#8D918F]">Capture Time:</span>
+                              <span
+                                className={`font-mono text-[11px] px-1.5 py-0.5 rounded ${
+                                  currentEvidence.item.evidence_verification?.capture_time.status === "match"
+                                    ? "bg-[#4C7A5E]/20 text-[#4C7A5E]"
+                                    : currentEvidence.item.evidence_verification?.capture_time.status === "mismatch"
+                                    ? "bg-[#F4B52C]/20 text-[#F4B52C]"
+                                    : "bg-[#1C1F21] text-[#8D918F]"
+                                }`}
+                              >
+                                {currentEvidence.item.evidence_verification?.capture_time.status === "match"
+                                  ? "Time consistent"
+                                  : currentEvidence.item.evidence_verification?.capture_time.status === "mismatch"
+                                  ? "Time mismatch"
+                                  : "Unavailable"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <p className="text-[11.5px] text-[#8D918F] leading-relaxed">
                         Photographic evidence submitted at the time of report creation.
                       </p>
@@ -326,19 +481,6 @@ export default function CitizenIssuePage() {
                   </div>
                 </div>
 
-                {/* Photo Evidence Assessment */}
-                {issue.imageDescription && (
-                  <div className="rounded-2xl border border-[#2C2A25] bg-[#151718] p-6">
-                    <h3 className="text-[12px] font-mono uppercase tracking-wider text-[#F4B52C] font-semibold mb-3 flex items-center gap-1.5">
-                      <Sparkles size={14} />
-                      <span>Photo Evidence Assessment</span>
-                    </h3>
-                    <div className="p-3.5 rounded-xl bg-[#1C1F21] border border-[#2C2A25] text-[13px] text-[#8D918F] leading-relaxed">
-                      {issue.imageDescription}
-                    </div>
-                  </div>
-                )}
-
                 {/* Clustered Reports Notice */}
                 {typeof issue.duplicateCount === "number" && issue.duplicateCount > 0 && (
                   <div className="rounded-2xl border border-[#2C2A25] bg-[#151718] p-5 flex items-start gap-3.5">
@@ -347,25 +489,25 @@ export default function CitizenIssuePage() {
                     </div>
                     <div>
                       <h4 className="text-[13.5px] font-semibold text-[#F3F0E8] mb-0.5">
-                        Community Clustered Report
+                        Related Community Reports Merged
                       </h4>
                       <p className="text-[12.5px] text-[#8D918F] leading-relaxed">
                         {issue.duplicateCount === 1
-                          ? "1 additional nearby citizen submission was merged into this issue to accelerate municipal repair dispatch."
-                          : `${issue.duplicateCount} additional nearby citizen submissions were merged into this issue to accelerate municipal repair dispatch.`}
+                          ? "1 additional nearby citizen submission was consolidated with this issue to expedite repair scheduling."
+                          : `${issue.duplicateCount} additional nearby citizen submissions were consolidated with this issue to expedite repair scheduling.`}
                       </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Right Column: Resolution Lifecycle & AI Diagnostics */}
+              {/* Right Column: Resolution Lifecycle & Authority Action */}
               <div className="md:col-span-5 space-y-6">
                 {/* Resolution Progress Timeline */}
                 <div className="rounded-2xl border border-[#2C2A25] bg-[#151718] p-6">
                   <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#2C2A25]">
                     <h3 className="text-[12px] font-mono uppercase tracking-wider text-[#F4B52C] font-semibold">
-                      Resolution Lifecycle
+                      Case Lifecycle Timeline
                     </h3>
                     <span className="text-[11px] font-mono text-[#8D918F]">
                       Stage {currentIdx + 1} of 5
@@ -373,7 +515,7 @@ export default function CitizenIssuePage() {
                   </div>
 
                   <div className="space-y-4">
-                    {statusSteps.map((step, idx) => {
+                    {lifecycleSteps.map((step, idx) => {
                       const isCompleted = idx < currentIdx;
                       const isCurrent = idx === currentIdx;
 
@@ -382,7 +524,7 @@ export default function CitizenIssuePage() {
                           <div className="flex flex-col items-center mt-0.5">
                             {isCompleted ? (
                               <div className="h-5 w-5 rounded-full bg-[#4C7A5E] text-white flex items-center justify-center">
-                                <CheckCircle2 size={13} />
+                                <Check size={12} strokeWidth={3} />
                               </div>
                             ) : isCurrent ? (
                               <div className="h-5 w-5 rounded-full bg-[#F4B52C] text-[#0D0F10] flex items-center justify-center font-bold text-[10px]">
@@ -394,9 +536,9 @@ export default function CitizenIssuePage() {
                               </div>
                             )}
 
-                            {idx < statusSteps.length - 1 && (
+                            {idx < lifecycleSteps.length - 1 && (
                               <div
-                                className={`w-0.5 h-8 my-1 transition-colors ${
+                                className={`w-0.5 h-9 my-1 transition-colors ${
                                   idx < currentIdx ? "bg-[#4C7A5E]" : "bg-[#2C2A25]"
                                 }`}
                               />
@@ -404,16 +546,23 @@ export default function CitizenIssuePage() {
                           </div>
 
                           <div className="flex-1 pb-1">
-                            <div
-                              className={`text-[13px] font-semibold ${
-                                isCurrent
-                                  ? "text-[#F4B52C]"
-                                  : isCompleted
-                                  ? "text-[#F3F0E8]"
-                                  : "text-[#8D918F]"
-                              }`}
-                            >
-                              {step.label}
+                            <div className="flex items-center justify-between">
+                              <span
+                                className={`text-[13px] font-semibold ${
+                                  isCurrent
+                                    ? "text-[#F4B52C]"
+                                    : isCompleted
+                                    ? "text-[#F3F0E8]"
+                                    : "text-[#8D918F]"
+                                }`}
+                              >
+                                {step.label}
+                              </span>
+                              {step.timestamp && (
+                                <span className="text-[10.5px] font-mono text-[#8D918F]">
+                                  {step.timestamp}
+                                </span>
+                              )}
                             </div>
                             <p className="text-[11.5px] text-[#8D918F] mt-0.5 leading-relaxed">
                               {step.description}
@@ -425,6 +574,66 @@ export default function CitizenIssuePage() {
                   </div>
                 </div>
 
+                {/* Authority Field Action & Work Order Card */}
+                {wo && (
+                  <div className="rounded-2xl border border-[#2C2A25] bg-[#151718] p-6 shadow-md">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#2C2A25]">
+                      <div className="flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-wider text-[#F4B52C] font-semibold">
+                        <Briefcase size={14} />
+                        <span>Field Action Status</span>
+                      </div>
+                      <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-[#1C1F21] text-[#F3F0E8] border border-[#2C2A25]">
+                        {wo.status.replace("_", " ")}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 text-[12.5px]">
+                      {wo.department_name && (
+                        <div className="flex justify-between items-center py-1.5 border-b border-[#2C2A25]/50">
+                          <span className="text-[#8D918F]">Assigned Department:</span>
+                          <span className="text-[#F3F0E8] font-medium">{wo.department_name}</span>
+                        </div>
+                      )}
+
+                      {wo.title && (
+                        <div className="flex justify-between items-center py-1.5 border-b border-[#2C2A25]/50">
+                          <span className="text-[#8D918F]">Action Item:</span>
+                          <span className="text-[#F3F0E8] font-medium truncate max-w-[180px]">{wo.title}</span>
+                        </div>
+                      )}
+
+                      {wo.started_at && (
+                        <div className="flex justify-between items-center py-1.5 border-b border-[#2C2A25]/50">
+                          <span className="text-[#8D918F]">Work Started:</span>
+                          <span className="font-mono text-[11.5px] text-[#F3F0E8]">
+                            {new Date(wo.started_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+
+                      {wo.completed_at && (
+                        <div className="flex justify-between items-center py-1.5 border-b border-[#2C2A25]/50">
+                          <span className="text-[#8D918F]">Work Completed:</span>
+                          <span className="font-mono text-[11.5px] text-[#4C7A5E]">
+                            {new Date(wo.completed_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+
+                      {wo.completion_notes && (
+                        <div className="pt-2">
+                          <span className="text-[11px] font-mono uppercase text-[#8D918F] block mb-1">
+                            Field Completion Notes:
+                          </span>
+                          <p className="p-2.5 rounded-lg bg-[#1C1F21] border border-[#2C2A25] text-[12px] text-[#F3F0E8] leading-relaxed">
+                            {wo.completion_notes}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* AI Diagnostic Assessment Card */}
                 {(typeof issue.confidence === "number" ||
                   typeof issue.severityScore === "number" ||
@@ -433,10 +642,10 @@ export default function CitizenIssuePage() {
                     <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#2C2A25]">
                       <div className="flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-wider text-[#F4B52C] font-semibold">
                         <ShieldCheck size={15} />
-                        <span>AI Diagnostic Metrics</span>
+                        <span>AI Diagnostic Assessment</span>
                       </div>
                       <span className="text-[10px] font-mono text-[#8D918F] bg-[#1C1F21] px-2 py-0.5 rounded border border-[#2C2A25]">
-                        Automated Analysis
+                        EfficientNet-B0
                       </span>
                     </div>
 

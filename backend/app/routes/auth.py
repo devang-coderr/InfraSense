@@ -18,6 +18,9 @@ def _user_out(user: User) -> UserOut:
         email=user.email,
         role=user.role,
         department=user.department.name if user.department else None,
+        organization=user.organization,
+        state=user.state,
+        district=user.district,
     )
 
 

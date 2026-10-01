@@ -108,12 +108,26 @@ export default function SettingsPage() {
                     </span>
                   </div>
                   <div className="text-[13px] text-[#8D918F] mt-0.5">{user.email}</div>
-                  {user.department && (
-                    <div className="flex items-center gap-1.5 text-[11.5px] font-mono text-[#4C7A5E] mt-1.5">
-                      <Building size={12} />
-                      <span>Department: {user.department}</span>
+                  {user.organization && (
+                    <div className="text-[12px] font-medium text-[#F3F0E8] mt-1">
+                      {user.organization}
                     </div>
                   )}
+                  <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                    {user.department && (
+                      <div className="flex items-center gap-1.5 text-[11.5px] font-mono text-[#4C7A5E]">
+                        <Building size={12} />
+                        <span>Department: {user.department}</span>
+                      </div>
+                    )}
+                    {(user.district || user.state) && (
+                      <div className="flex items-center gap-1.5 text-[11.5px] font-mono text-[#F4B52C]">
+                        <span>
+                          Jurisdiction: {user.district ? `${user.district}, ${user.state}` : user.state}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

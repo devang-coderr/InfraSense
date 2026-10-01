@@ -5,22 +5,13 @@ import { AuthorityShell } from "@/components/authority/AuthorityShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AnalyticsCharts } from "@/components/authority/AnalyticsCharts";
 import {
-  getCategoryBreakdown,
-  getTrends,
-  getResolutionStats,
-  getHealth,
-  type CategoryCount,
-  type TrendPoint,
-  type ResolutionStats,
-  type HealthResponse,
+  getAnalyticsOverview,
+  type AnalyticsOverview,
 } from "@/lib/api/analytics";
 import { RefreshCw, Activity, AlertTriangle, ShieldCheck } from "lucide-react";
 
 export default function AnalyticsPage() {
-  const [categories, setCategories] = useState<CategoryCount[]>([]);
-  const [trends, setTrends] = useState<TrendPoint[]>([]);
-  const [resolutionStats, setResolutionStats] = useState<ResolutionStats | null>(null);
-  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,17 +19,8 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [catData, trendData, resData, healthData] = await Promise.all([
-        getCategoryBreakdown().catch(() => []),
-        getTrends().catch(() => []),
-        getResolutionStats().catch(() => null),
-        getHealth().catch(() => null),
-      ]);
-
-      setCategories(catData || []);
-      setTrends(trendData || []);
-      setResolutionStats(resData);
-      setHealth(healthData);
+      const data = await getAnalyticsOverview();
+      setOverview(data);
     } catch (err: any) {
       setError(err?.message || "Failed to load real-time analytics data from the platform.");
     } finally {
@@ -54,9 +36,9 @@ export default function AnalyticsPage() {
     <AuthorityShell>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <PageHeader
-          eyebrow="City Analytics"
-          title="Infrastructure Intelligence & Metrics"
-          description="Real-time aggregation of municipal problem categories, resolution performance, and temporal patterns."
+          eyebrow="City Analytics & Intelligence"
+          title="Infrastructure Intelligence & Impact Analytics"
+          description="Real-time aggregation of citizen incident volume, category distribution, severity metrics, field work orders, and resolution performance."
         />
         <button
           type="button"
@@ -78,19 +60,35 @@ export default function AnalyticsPage() {
 
       {loading ? (
         <div className="space-y-6 animate-pulse">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-24 rounded-2xl bg-[#151718] border border-[#2C2A25]" />
+            ))}
+          </div>
+          <div className="h-40 rounded-2xl bg-[#151718] border border-[#2C2A25]" />
           <div className="grid md:grid-cols-2 gap-6">
             <div className="h-72 rounded-2xl bg-[#151718] border border-[#2C2A25]" />
             <div className="h-72 rounded-2xl bg-[#151718] border border-[#2C2A25]" />
-            <div className="h-64 rounded-2xl bg-[#151718] border border-[#2C2A25] md:col-span-2" />
+            <div className="h-64 rounded-2xl bg-[#151718] border border-[#2C2A25]" />
+            <div className="h-64 rounded-2xl bg-[#151718] border border-[#2C2A25]" />
           </div>
           <div className="h-44 rounded-2xl bg-[#151718] border border-[#2C2A25]" />
         </div>
       ) : (
         <>
           <AnalyticsCharts
-            categories={categories}
-            trends={trends}
-            resolutionStats={resolutionStats}
+            summary={overview?.summary}
+            categories={overview?.category_breakdown || []}
+            severityDistribution={overview?.severity_distribution || []}
+            workOrderStats={overview?.work_order_stats}
+            wardBreakdown={overview?.ward_breakdown || []}
+            trends={overview?.trends || []}
+            resolutionStats={overview ? {
+              total_issues: overview.summary.total_reports,
+              resolved_issues: overview.summary.resolved_issues,
+              resolution_rate: overview.summary.resolution_rate,
+              average_resolution_days: overview.summary.average_resolution_days,
+            } : null}
           />
 
           {/* Infrastructure Health Card */}
@@ -103,16 +101,16 @@ export default function AnalyticsPage() {
                     Infrastructure Health Index
                   </h3>
                   <p className="text-[12px] text-[#8D918F] mt-0.5">
-                    {health?.methodology || "Multi-category municipal asset health assessment score"}
+                    {overview?.health?.methodology || "Multi-category municipal asset health assessment score"}
                   </p>
                 </div>
               </div>
 
-              {health?.city_health_score !== undefined ? (
+              {overview?.health?.city_health_score !== undefined ? (
                 <div className="flex items-baseline gap-1.5 self-start sm:self-auto bg-[#1C1F21] px-3.5 py-1.5 rounded-xl border border-[#2C2A25]">
                   <span className="text-[10px] font-mono text-[#8D918F] uppercase tracking-wider">Score:</span>
                   <span className="font-mono text-[22px] font-bold text-[#F4B52C]">
-                    {health.city_health_score}
+                    {overview.health.city_health_score}
                   </span>
                   <span className="font-mono text-[12px] text-[#8D918F]">/ 100</span>
                 </div>
@@ -121,9 +119,9 @@ export default function AnalyticsPage() {
               )}
             </div>
 
-            {health?.categories && health.categories.length > 0 ? (
+            {overview?.health?.categories && overview.health.categories.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {health.categories.map((h) => {
+                {overview.health.categories.map((h) => {
                   const scoreColor =
                     h.score >= 80
                       ? "#4C7A5E"

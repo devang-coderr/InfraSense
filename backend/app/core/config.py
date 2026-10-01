@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     AI_MODEL_PATH: str = ""
     WEATHER_API_KEY: str = ""
 
+    # Evidence Verification Thresholds
+    EVIDENCE_GPS_MATCH_THRESHOLD_METERS: float = 150.0  # Allowed GPS drift (meters) between device & EXIF
+    EVIDENCE_TIME_MATCH_THRESHOLD_SECONDS: int = 300   # Allowed time delta (seconds, 5 mins) between device & EXIF
+
+    # Duplicate Detection Thresholds
+    DUPLICATE_LOCATION_THRESHOLD_METERS: float = 100.0  # Max distance (meters) to consider candidate report nearby
+    DUPLICATE_TIME_WINDOW_HOURS: float = 24.0           # Max time delta (hours) to consider candidate report recent
+    DUPLICATE_IMAGE_SIMILARITY_THRESHOLD: float = 0.85  # Min perceptual hash similarity (0.0 to 1.0) for strong visual match
+
     # City bounding box used only to compute the stylised 0-100 x/y map
     # position the frontend's GISMap component expects. This is NOT real
     # GIS projection — it's a cosmetic normalisation. See gis_service.py.

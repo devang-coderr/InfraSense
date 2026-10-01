@@ -63,6 +63,7 @@ export interface CreateIssuePayload {
   latitude: number;
   longitude: number;
   media_id?: number;
+  media_ids?: number[];
   ai_category?: string;
   ai_confidence?: number;
 }

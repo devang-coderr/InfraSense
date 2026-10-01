@@ -46,8 +46,11 @@ class MediaType(str, enum.Enum):
 
 
 class WorkOrderStatus(str, enum.Enum):
+    PENDING = "pending"
     ASSIGNED = "assigned"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+    VERIFIED = "verified"
     VERIFICATION = "verification"
     RESOLVED = "resolved"
+

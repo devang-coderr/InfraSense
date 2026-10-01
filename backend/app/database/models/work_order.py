@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Integer, String, DateTime, Boolean, ForeignKey, Enum as SAEnum
+from sqlalchemy import Integer, String, DateTime, Boolean, ForeignKey, Text, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.database import Base
@@ -15,6 +15,10 @@ class WorkOrder(Base):
     department_id: Mapped[int] = mapped_column(ForeignKey("departments.id"))
     assigned_to: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
+    title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    completion_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     priority: Mapped[int] = mapped_column(Integer, default=0)
     deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -22,12 +26,18 @@ class WorkOrder(Base):
 
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
 
+    issue = relationship("Issue", back_populates="work_orders", foreign_keys=[issue_id], lazy="joined")
+    department = relationship("Department", foreign_keys=[department_id], lazy="joined")
+    assignee = relationship("User", foreign_keys=[assigned_to], lazy="joined")
+    verifier = relationship("User", foreign_keys=[verified_by], lazy="joined")
     evidence: Mapped["ResolutionEvidence | None"] = relationship(back_populates="work_order", uselist=False)
 
 

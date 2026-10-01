@@ -21,6 +21,8 @@ class Issue(Base):
     latitude: Mapped[float] = mapped_column(Float)
     longitude: Mapped[float] = mapped_column(Float)
     ward_id: Mapped[int | None] = mapped_column(ForeignKey("wards.id"), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    district: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     severity: Mapped[Severity] = mapped_column(SAEnum(Severity), default=Severity.LOW)
     severity_score: Mapped[int] = mapped_column(Integer, default=0)
@@ -48,6 +50,7 @@ class Issue(Base):
         back_populates="issue", cascade="all, delete-orphan"
     )
     media: Mapped[list["IssueMedia"]] = relationship(back_populates="issue", cascade="all, delete-orphan")
+    work_orders: Mapped[list["WorkOrder"]] = relationship(back_populates="issue", cascade="all, delete-orphan", foreign_keys="WorkOrder.issue_id")
 
 
 class IssueSeverityFactor(Base):

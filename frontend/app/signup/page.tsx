@@ -27,6 +27,9 @@ function SignupForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [department, setDepartment] = useState("Roads");
+  const [organization, setOrganization] = useState("Bhopal Municipal Corporation");
+  const [stateName, setStateName] = useState("Madhya Pradesh");
+  const [district, setDistrict] = useState("Bhopal");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,6 +60,13 @@ function SignupForm() {
       return;
     }
 
+    if (portal === "authority") {
+      if (!stateName.trim() || !district.trim()) {
+        setError("State and District are required to assign Authority jurisdiction.");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const user = await register(
@@ -64,7 +74,10 @@ function SignupForm() {
         email.trim(),
         password,
         portal === "citizen" ? "citizen" : "officer",
-        portal === "authority" ? department : undefined
+        portal === "authority" ? department : undefined,
+        portal === "authority" ? organization.trim() : undefined,
+        portal === "authority" ? stateName.trim() : undefined,
+        portal === "authority" ? district.trim() : undefined
       );
       router.push(user.role === "citizen" ? "/citizen" : "/authority");
     } catch (err) {
@@ -165,22 +178,68 @@ function SignupForm() {
         </div>
 
         {portal === "authority" && (
-          <div>
-            <label className="text-[11px] font-mono uppercase tracking-wide text-[var(--text-muted)] mb-1.5 block">
-              Department
-            </label>
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="focus-ring w-full rounded-lg bg-[var(--bg-alt)] border border-[var(--border)] px-3 py-2.5 text-[13.5px] text-[var(--text)] cursor-pointer"
-            >
-              {DEPARTMENTS.map((d) => (
-                <option key={d} value={d}>
-                  {d} Department
-                </option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div>
+              <label className="text-[11px] font-mono uppercase tracking-wide text-[var(--text-muted)] mb-1.5 block">
+                Organization / Authority Name
+              </label>
+              <input
+                type="text"
+                required
+                value={organization}
+                onChange={(e) => setOrganization(e.target.value)}
+                className="focus-ring w-full rounded-lg bg-[var(--bg-alt)] border border-[var(--border)] px-3 py-2.5 text-[13.5px]"
+                placeholder="e.g. Bhopal Municipal Corporation"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-mono uppercase tracking-wide text-[var(--text-muted)] mb-1.5 block">
+                  Jurisdiction State
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={stateName}
+                  onChange={(e) => setStateName(e.target.value)}
+                  className="focus-ring w-full rounded-lg bg-[var(--bg-alt)] border border-[var(--border)] px-3 py-2.5 text-[13.5px]"
+                  placeholder="e.g. Madhya Pradesh"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-mono uppercase tracking-wide text-[var(--text-muted)] mb-1.5 block">
+                  Jurisdiction District
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  className="focus-ring w-full rounded-lg bg-[var(--bg-alt)] border border-[var(--border)] px-3 py-2.5 text-[13.5px]"
+                  placeholder="e.g. Bhopal"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-mono uppercase tracking-wide text-[var(--text-muted)] mb-1.5 block">
+                Department
+              </label>
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className="focus-ring w-full rounded-lg bg-[var(--bg-alt)] border border-[var(--border)] px-3 py-2.5 text-[13.5px] text-[var(--text)] cursor-pointer"
+              >
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>
+                    {d} Department
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
 
         <div>

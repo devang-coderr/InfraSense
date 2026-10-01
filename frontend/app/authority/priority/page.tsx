@@ -20,7 +20,7 @@ import { SeverityBadge, StatusPill } from "@/components/ui/Primitives";
 import { Button } from "@/components/ui/Button";
 import { getPriorityQueue } from "@/lib/api/authority";
 import { ApiError } from "@/lib/api/client";
-import type { Issue, IssueStatus } from "@/lib/types";
+import { type Issue, type IssueStatus, INFRASTRUCTURE_CATEGORIES } from "@/lib/types";
 
 const statusTone: Record<IssueStatus, "neutral" | "accent" | "high" | "low"> = {
   reported: "neutral",
@@ -30,14 +30,18 @@ const statusTone: Record<IssueStatus, "neutral" | "accent" | "high" | "low"> = {
   resolved: "low",
 };
 
+const CATEGORIES = INFRASTRUCTURE_CATEGORIES;
+
 export default function PriorityQueuePage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [deptFilter, setDeptFilter] = useState<string>("all");
+  const [wardFilter, setWardFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const fetchPriorityQueue = useCallback(async () => {
@@ -61,11 +65,34 @@ export default function PriorityQueuePage() {
     fetchPriorityQueue();
   }, [fetchPriorityQueue]);
 
+  // Unique wards for filter
+  const wards = useMemo(() => {
+    const set = new Set<string>();
+    issues.forEach((i) => {
+      if (i.ward && i.ward.trim() && i.ward !== "Unassigned") set.add(i.ward.trim());
+    });
+    return Array.from(set).sort();
+  }, [issues]);
+
+  // Metrics summary
+  const metrics = useMemo(() => {
+    const total = issues.length;
+    const critical = issues.filter((i) => i.severity === "critical").length;
+    const high = issues.filter((i) => i.severity === "high").length;
+    const avgScore =
+      total > 0
+        ? Math.round(issues.reduce((acc, i) => acc + (i.priorityScore || 0), 0) / total)
+        : 0;
+    return { total, critical, high, avgScore };
+  }, [issues]);
+
   // Combined client-side filtering
   const filtered = useMemo(() => {
     return issues.filter((i) => {
+      if (categoryFilter !== "all" && i.category?.toLowerCase() !== categoryFilter.toLowerCase()) return false;
       if (severityFilter !== "all" && i.severity !== severityFilter) return false;
       if (deptFilter !== "all" && i.department !== deptFilter) return false;
+      if (wardFilter !== "all" && i.ward !== wardFilter) return false;
       if (statusFilter !== "all" && i.status !== statusFilter) return false;
 
       if (searchQuery.trim()) {
@@ -79,14 +106,19 @@ export default function PriorityQueuePage() {
       }
       return true;
     });
-  }, [issues, severityFilter, deptFilter, statusFilter, searchQuery]);
+  }, [issues, categoryFilter, severityFilter, deptFilter, wardFilter, statusFilter, searchQuery]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => (b.priorityScore ?? 0) - (a.priorityScore ?? 0));
   }, [filtered]);
 
   const hasActiveFilters =
-    severityFilter !== "all" || deptFilter !== "all" || statusFilter !== "all" || searchQuery.trim() !== "";
+    categoryFilter !== "all" ||
+    severityFilter !== "all" ||
+    deptFilter !== "all" ||
+    wardFilter !== "all" ||
+    statusFilter !== "all" ||
+    searchQuery.trim() !== "";
 
   return (
     <AuthorityShell>
@@ -115,6 +147,36 @@ export default function PriorityQueuePage() {
         </div>
       </div>
 
+      {/* Priority Metrics Summary Bar */}
+      {!loading && !error && issues.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-6">
+          <div className="p-4 rounded-xl bg-[#151718] border border-[#2C2A25]">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-[#8D918F] mb-1">
+              Active Queue
+            </div>
+            <div className="text-2xl font-bold font-mono text-[#F3F0E8]">{metrics.total}</div>
+          </div>
+          <div className="p-4 rounded-xl bg-[#151718] border border-[#2C2A25]">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-[#B23A2C] mb-1">
+              Critical Severity
+            </div>
+            <div className="text-2xl font-bold font-mono text-[#B23A2C]">{metrics.critical}</div>
+          </div>
+          <div className="p-4 rounded-xl bg-[#151718] border border-[#2C2A25]">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-[#F4B52C] mb-1">
+              High Severity
+            </div>
+            <div className="text-2xl font-bold font-mono text-[#F4B52C]">{metrics.high}</div>
+          </div>
+          <div className="p-4 rounded-xl bg-[#151718] border border-[#2C2A25]">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-[#8D918F] mb-1">
+              Average Priority
+            </div>
+            <div className="text-2xl font-bold font-mono text-[#F4B52C]">P-{metrics.avgScore}</div>
+          </div>
+        </div>
+      )}
+
       {/* Filter and Search Bar */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mb-6">
         {/* Search Field */}
@@ -130,7 +192,23 @@ export default function PriorityQueuePage() {
         </div>
 
         {/* Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Category Filter */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            aria-label="Filter by category"
+            className="focus-ring bg-[#151718] border border-[#2C2A25] rounded-xl px-3 py-2 text-[12px] font-mono text-[#F3F0E8] cursor-pointer"
+          >
+            <option value="all">Category: All</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+
+          {/* Severity Filter */}
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
@@ -144,6 +222,7 @@ export default function PriorityQueuePage() {
             <option value="low">Low</option>
           </select>
 
+          {/* Department Filter */}
           <select
             value={deptFilter}
             onChange={(e) => setDeptFilter(e.target.value)}
@@ -158,6 +237,24 @@ export default function PriorityQueuePage() {
             <option value="Traffic">Traffic</option>
           </select>
 
+          {/* Ward Filter */}
+          {wards.length > 0 && (
+            <select
+              value={wardFilter}
+              onChange={(e) => setWardFilter(e.target.value)}
+              aria-label="Filter by municipal ward"
+              className="focus-ring bg-[#151718] border border-[#2C2A25] rounded-xl px-3 py-2 text-[12px] font-mono text-[#F3F0E8] cursor-pointer"
+            >
+              <option value="all">Ward: All</option>
+              {wards.map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -177,8 +274,10 @@ export default function PriorityQueuePage() {
               type="button"
               onClick={() => {
                 setSearchQuery("");
+                setCategoryFilter("all");
                 setSeverityFilter("all");
                 setDeptFilter("all");
+                setWardFilter("all");
                 setStatusFilter("all");
               }}
               className="text-[12px] font-mono text-[#F4B52C] hover:underline px-2 py-1 cursor-pointer"
@@ -250,8 +349,10 @@ export default function PriorityQueuePage() {
           <Button
             onClick={() => {
               setSearchQuery("");
+              setCategoryFilter("all");
               setSeverityFilter("all");
               setDeptFilter("all");
+              setWardFilter("all");
               setStatusFilter("all");
             }}
             variant="secondary"
@@ -266,8 +367,8 @@ export default function PriorityQueuePage() {
       {!loading && !error && sorted.length > 0 && (
         <div className="rounded-2xl border border-[#2C2A25] bg-[#151718] overflow-hidden shadow-xl">
           {/* Table Header (Desktop) */}
-          <div className="hidden md:grid grid-cols-[80px_2.4fr_1.1fr_1.1fr_1.1fr_1.1fr_110px] gap-4 px-6 py-3.5 border-b border-[#2C2A25] bg-[#121415] text-[11px] font-mono uppercase tracking-wider text-[#8D918F]">
-            <div>Score</div>
+          <div className="hidden md:grid grid-cols-[85px_2.3fr_1.1fr_1.1fr_1.1fr_1.1fr_110px] gap-4 px-6 py-3.5 border-b border-[#2C2A25] bg-[#121415] text-[11px] font-mono uppercase tracking-wider text-[#8D918F]">
+            <div>Priority</div>
             <div>Defect & Location</div>
             <div>Severity</div>
             <div>Department</div>
@@ -289,12 +390,12 @@ export default function PriorityQueuePage() {
               return (
                 <div
                   key={issue.id}
-                  className="grid grid-cols-1 md:grid-cols-[80px_2.4fr_1.1fr_1.1fr_1.1fr_1.1fr_110px] gap-3 md:gap-4 px-5 sm:px-6 py-4 items-center hover:bg-[#1C1F21] transition-colors group"
+                  className="grid grid-cols-1 md:grid-cols-[85px_2.3fr_1.1fr_1.1fr_1.1fr_1.1fr_110px] gap-3 md:gap-4 px-5 sm:px-6 py-4 items-center hover:bg-[#1C1F21] transition-colors group"
                 >
-                  {/* Priority Score */}
+                  {/* Priority Score Badge */}
                   <div className="flex items-center gap-2 md:block">
                     <span
-                      className="font-mono text-[13px] font-bold px-2.5 py-1 rounded-md border"
+                      className="font-mono text-[13px] font-bold px-2.5 py-1 rounded-md border inline-block"
                       style={{
                         color: priorityColor,
                         borderColor: `${priorityColor}40`,
@@ -308,22 +409,33 @@ export default function PriorityQueuePage() {
                     </span>
                   </div>
 
-                  {/* Defect Title & Ward */}
+                  {/* Defect Title, Category & Ward */}
                   <div>
-                    <h4 className="text-[14px] font-semibold text-[#F3F0E8] group-hover:text-[#F4B52C] transition-colors leading-snug">
-                      {issue.title}
-                    </h4>
-                    <div className="flex items-center gap-2 text-[12px] text-[#8D918F] mt-1 font-mono">
-                      <span className="hidden md:inline text-[#8D918F]">#{issue.id}</span>
-                      <span className="hidden md:inline">•</span>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-mono text-[11px] text-[#F4B52C] font-semibold">
+                        #{issue.id}
+                      </span>
+                      <h4 className="text-[14px] font-semibold text-[#F3F0E8] group-hover:text-[#F4B52C] transition-colors leading-snug">
+                        {issue.category || issue.title}
+                      </h4>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] text-[#8D918F] font-mono">
                       <span className="flex items-center gap-1">
                         <MapPin size={11} className="text-[#F4B52C]" />
                         <span>{issue.ward || "Unassigned Zone"}</span>
                       </span>
+                      {issue.title && issue.title !== issue.category && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate max-w-[200px] text-[#8D918F]/90">
+                            {issue.title}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Severity */}
+                  {/* Severity Badge */}
                   <div>
                     {issue.severity && <SeverityBadge severity={issue.severity} />}
                   </div>
@@ -362,7 +474,7 @@ export default function PriorityQueuePage() {
                       href={`/authority/issues/${issue.id}`}
                       className="focus-ring inline-flex items-center gap-1 text-[12px] font-mono text-[#F4B52C] hover:text-[#F4B52C]/80 border border-[#2C2A25] hover:border-[#F4B52C]/40 bg-[#121415] px-3 py-1.5 rounded-lg transition-all"
                     >
-                      <span>Open</span>
+                      <span>Inspect</span>
                       <ArrowRight size={12} />
                     </Link>
                   </div>

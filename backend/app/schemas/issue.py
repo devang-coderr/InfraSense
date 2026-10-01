@@ -15,7 +15,10 @@ class IssueCreateRequest(BaseModel):
     description: str = Field(default="", max_length=2000)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
+    state: str | None = None
+    district: str | None = None
     media_id: int | None = None
+    media_ids: list[int] | None = None
     # Optional: if the frontend already ran POST /ai/analyze-image first
     # (as the ReportForm flow does) it can pass that result along so we
     # don't analyze twice. If omitted, the backend runs it itself.
@@ -35,8 +38,74 @@ class AIAnalyzeResult(BaseModel):
     confidence: int
     severity: str
     severity_score: int
-    is_baseline: bool = True
-    note: str = "Baseline/placeholder result — no trained model is wired in yet."
+    is_baseline: bool = False
+    note: str = "Classified with EfficientNet-B0 transfer learning model."
+
+
+class GPSVerificationOut(BaseModel):
+    device_available: bool
+    exif_available: bool
+    distance_meters: float | None = None
+    status: str = "unavailable"
+
+
+class TimeVerificationOut(BaseModel):
+    device_available: bool
+    exif_available: bool
+    difference_seconds: int | None = None
+    status: str = "unavailable"
+
+
+class EvidenceVerificationOut(BaseModel):
+    gps: GPSVerificationOut
+    capture_time: TimeVerificationOut
+
+
+class IssueMediaItem(BaseModel):
+    id: int
+    file_url: str
+    media_type: str = "image"
+    device_latitude: float | None = None
+    device_longitude: float | None = None
+    device_captured_at: str | None = None
+    exif_latitude: float | None = None
+    exif_longitude: float | None = None
+    exif_captured_at: str | None = None
+    camera_make: str | None = None
+    camera_model: str | None = None
+    evidence_verification: EvidenceVerificationOut | None = None
+
+
+class DuplicateSignalMatchOut(BaseModel):
+    issue_id: str
+    category_match: bool
+    category: str
+    distance_meters: float | None = None
+    location_nearby: bool = False
+    time_difference_seconds: int | None = None
+    time_recent: bool = False
+    image_similarity: float | None = None
+    image_strong_match: bool = False
+    similarity_score: float
+    reasons: list[str] = Field(default_factory=list)
+
+
+class DuplicateAssessmentOut(BaseModel):
+    status: str = "no_clear_match"  # "possible_duplicate" | "no_clear_match" | "insufficient_evidence"
+    matched_issue_id: str | None = None
+    matches: list[DuplicateSignalMatchOut] = Field(default_factory=list)
+
+
+class CitizenWorkOrderOut(BaseModel):
+    id: int
+    department_name: str | None = None
+    status: str
+    title: str | None = None
+    created_at: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    verified_at: str | None = None
+    completion_notes: str | None = None
 
 
 class IssueOut(BaseModel):
@@ -66,10 +135,18 @@ class IssueOut(BaseModel):
     duplicateCount: int
     reportedAt: str  # ISO-8601 string; frontend formats to "2 days ago" etc.
     imageDescription: str
+    state: str | None = None
+    district: str | None = None
     media_id: int | None = None
     media_url: str | None = None
     file_url: str | None = None
     image_url: str | None = None
+    media_ids: list[int] = Field(default_factory=list)
+    media_urls: list[str] = Field(default_factory=list)
+    evidence_images: list[IssueMediaItem] = Field(default_factory=list)
+    duplicate_assessment: DuplicateAssessmentOut | None = None
+    work_order: CitizenWorkOrderOut | None = None
+    work_orders: list[CitizenWorkOrderOut] = Field(default_factory=list)
 
 
 class IssueListResponse(BaseModel):

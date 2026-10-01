@@ -16,6 +16,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole), default=UserRole.CITIZEN)
     department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"), nullable=True)
+    organization: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    district: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

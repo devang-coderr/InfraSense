@@ -12,6 +12,7 @@ const links = [
   { href: "/#platform", label: "Platform" },
   { href: "/#how-it-works", label: "How It Works" },
   { href: "/#intelligence", label: "Intelligence" },
+  { href: "/transparency", label: "Transparency" },
   { href: "/authority", label: "For Authorities" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
